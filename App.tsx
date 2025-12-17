@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { BookOpen, Clock, DollarSign, Zap, ArrowRight, CheckCircle2, Bot, TrendingUp, Info, Rocket, Smile } from 'lucide-react';
+import { BookOpen, Clock, DollarSign, Zap, ArrowRight, CheckCircle2, Bot, TrendingUp, Info, Rocket, Smile, Lock, X } from 'lucide-react';
 import InputSlider from './components/InputSlider';
 import Charts from './components/Charts';
 import { CalculationData, CalculationResults } from './types';
@@ -26,13 +26,15 @@ const App: React.FC = () => {
   const [minutesPerDocAuto, setMinutesPerDocAuto] = useState<number>(15);
   const [setupCost, setSetupCost] = useState<number>(2000);
   const [funActivity, setFunActivity] = useState<string>(FUN_ACTIVITIES[0]);
+  
+  // Unlock / Modal State
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+  const [showEmailModal, setShowEmailModal] = useState<boolean>(false);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [emailError, setEmailError] = useState<boolean>(false);
 
   const [insight, setInsight] = useState<string | null>(null);
   const [isGeneratingInsight, setIsGeneratingInsight] = useState<boolean>(false);
-
-  // Email gate state
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
-  const [emailInput, setEmailInput] = useState<string>('');
 
   // Set a random activity on mount
   useEffect(() => {
@@ -42,7 +44,7 @@ const App: React.FC = () => {
   // --- Calculations ---
   const results: CalculationResults = useMemo(() => {
     const annualDocs = monthlyVolume * 12;
-
+    
     // Time calculations (in hours)
     const annualHoursManual = annualDocs * hoursPerDocManual;
     const annualHoursAuto = annualDocs * (minutesPerDocAuto / 60);
@@ -52,16 +54,16 @@ const App: React.FC = () => {
     const annualCostManual = annualHoursManual * hourlyRate;
     const annualCostAuto = annualHoursAuto * hourlyRate;
     const annualSavings = annualCostManual - annualCostAuto;
-
+    
     // ROI Days
     // Calculate daily savings based on working days (approx 260 days/year)
     const WORKING_DAYS_PER_YEAR = 260;
     const dailySavings = annualSavings / WORKING_DAYS_PER_YEAR;
-
+    
     // Formula: setupCost / (annualSavings / 260)
     // Handle cases where annualSavings is zero or negative
     const roiDays = dailySavings > 0 ? setupCost / dailySavings : 0;
-
+    
     return {
       annualSavings,
       monthlySavings: annualSavings / 12,
@@ -87,39 +89,59 @@ const App: React.FC = () => {
     setIsGeneratingInsight(false);
   };
 
-  const handleUnlockResults = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (emailInput && emailInput.includes('@')) {
-      setIsUnlocked(true);
+  const sendWebhookData = (email: string) => {
+    // Send all input and result data to the n8n webhook.
+    fetch('https://n8n.srv1137065.hstgr.cloud/webhook/a8d8e344-8947-482c-afcf-c77825e79095', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        timestamp: new Date().toISOString(),
+        email: email,
+        inputs,
+        results,
+        funActivity,
+        // We won't have the insight yet when unlocking, but that's okay
+        source: "Unlock Report"
+      })
+    }).then(() => {
+      console.log('Webhook sent successfully');
+    }).catch(err => {
+      console.error('Failed to send webhook data:', err);
+    });
+  };
 
-      // Send email to webhook
-      try {
-        await fetch('https://n8n.srv1137065.hstgr.cloud/webhook/a8d8e344-8947-482c-afcf-c77825e79095', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: emailInput,
-            timestamp: new Date().toISOString(),
-            calculatorInputs: inputs,
-            calculatorResults: results,
-          }),
-        });
-      } catch (error) {
-        console.error('Failed to send to webhook:', error);
-        // Still unlock even if webhook fails
-      }
+  const handleUnlockSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userEmail || !userEmail.includes('@')) {
+      setEmailError(true);
+      return;
     }
+    
+    // 1. Send Data
+    sendWebhookData(userEmail);
+    
+    // 2. Unlock UI
+    setIsUnlocked(true);
+    setShowEmailModal(false);
+    
+    // 3. Auto-trigger the AI insight as a "Bonus"
+    handleGenerateInsight();
   };
 
   // Data for the Chart
   const monthlyManualCost = (monthlyVolume * hoursPerDocManual * hourlyRate);
-  const monthlyAutomatedCost = (monthlyVolume * (minutesPerDocAuto / 60) * hourlyRate);
+  const monthlyAutomatedCost = (monthlyVolume * (minutesPerDocAuto/60) * hourlyRate);
+
+  // Email construction
+  const emailSubject = "Pilot Program Inquiry";
+  const emailBody = "Hi Bryan, I ran the numbers and I'm ready to stop drafting manually. Also, I might start roller skating.";
+  const mailtoLink = `mailto:thebryanengel@gmail.com?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20">
-
+      
       {/* Header */}
       <header className="bg-slate-900 text-white pt-12 pb-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-slate-800 to-transparent opacity-50 skew-x-12 transform origin-top-right"></div>
@@ -129,7 +151,7 @@ const App: React.FC = () => {
             <span className="text-sm font-bold tracking-widest uppercase">LegalFlow Automation</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold mb-6 leading-tight">
-            See the value of your <br />
+            See the value of your <br/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-indigo-300">billable time</span> restored.
             <span className="block text-2xl md:text-3xl mt-2 text-slate-400 font-sans font-light">(And maybe your sanity too.)</span>
           </h1>
@@ -142,7 +164,7 @@ const App: React.FC = () => {
       {/* Main Content - Split Layout */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16 relative z-20">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
+          
           {/* Left Column: Inputs */}
           <div className="lg:col-span-5 space-y-6">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 md:p-8">
@@ -150,7 +172,7 @@ const App: React.FC = () => {
                 <BookOpen className="w-5 h-5 mr-2 text-primary-600" />
                 The Boring Stuff (Metrics)
               </h2>
-
+              
               <InputSlider
                 label="Billable Hourly Rate"
                 value={hourlyRate}
@@ -172,16 +194,16 @@ const App: React.FC = () => {
                 description="How many of these headaches do you handle?"
               />
 
-              <InputSlider
-                label="Implementation Fee"
-                value={setupCost}
-                onChange={setSetupCost}
-                min={0}
-                max={10000}
-                step={100}
-                prefix="$"
-                description="One-time cost (the price of freedom)."
-              />
+               <InputSlider
+                  label="Implementation Fee"
+                  value={setupCost}
+                  onChange={setSetupCost}
+                  min={0}
+                  max={10000}
+                  step={100}
+                  prefix="$"
+                  description="One-time cost (the price of freedom)."
+                />
 
               <div className="pt-6 border-t border-slate-100">
                 <InputSlider
@@ -194,7 +216,7 @@ const App: React.FC = () => {
                   unit=" hrs"
                   description="Time spent wrestling with formatting manually."
                 />
-
+                
                 <InputSlider
                   label="Automated Time"
                   value={minutesPerDocAuto}
@@ -209,20 +231,28 @@ const App: React.FC = () => {
             </div>
 
             {/* AI Insight Card */}
-            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-xl p-6 md:p-8 text-white relative overflow-hidden">
-              {/* Decorative background element */}
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary-500 rounded-full blur-[60px] opacity-20"></div>
+            <div className={`bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl shadow-xl p-6 md:p-8 text-white relative overflow-hidden transition-all duration-500 ${!isUnlocked ? 'opacity-80' : ''}`}>
+               {/* Decorative background element */}
+               <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary-500 rounded-full blur-[60px] opacity-20"></div>
 
               <div className="relative z-10">
                 <h3 className="text-lg font-bold mb-3 flex items-center">
                   <Bot className="w-5 h-5 mr-2 text-indigo-400" />
                   The AI's Hot Take
                 </h3>
+                
+                {/* LOCKED STATE FOR AI CARD */}
+                {!isUnlocked && (
+                   <div className="text-slate-300 text-sm italic">
+                     <p>Unlock your full report to get a personalized efficiency roast from our AI.</p>
+                   </div>
+                )}
 
-                {!insight && !isGeneratingInsight && (
+                {/* UNLOCKED BUT NOT GENERATED */}
+                {isUnlocked && !insight && !isGeneratingInsight && (
                   <div className="text-slate-300 text-sm">
                     <p className="mb-4">Want a witty breakdown of what these numbers actually mean for your life?</p>
-                    <button
+                    <button 
                       onClick={handleGenerateInsight}
                       className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center"
                     >
@@ -257,150 +287,204 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Results */}
+          {/* Right Column: Results (With Lock Overlay) */}
           <div className="lg:col-span-7 space-y-6 relative">
-
-            {/* Email Gate Overlay */}
-            {!isUnlocked && (
-              <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-2xl">
-                <div className="bg-white p-8 rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full mx-4">
-                  <h3 className="text-2xl font-bold text-slate-900 mb-2 text-center">
-                    Unlock Your Results
-                  </h3>
-                  <p className="text-slate-600 mb-6 text-center">
-                    Enter your email to see your personalized ROI breakdown
-                  </p>
-                  <form onSubmit={handleUnlockResults} className="space-y-4">
-                    <input
-                      type="email"
-                      value={emailInput}
-                      onChange={(e) => setEmailInput(e.target.value)}
-                      placeholder="your@email.com"
-                      required
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                    <button
-                      type="submit"
-                      className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-bold text-lg transition-colors"
-                    >
-                      Show My Results
-                    </button>
-                  </form>
-                  <p className="text-xs text-slate-400 mt-4 text-center">
-                    We respect your privacy. No spam, ever.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Big Numbers Grid */}
-            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${!isUnlocked ? 'filter blur-sm' : ''}`}>
-              <div className="bg-white rounded-2xl shadow-lg border-l-4 border-primary-500 p-6 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center space-x-2 group relative">
-                    <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide cursor-help border-b border-dashed border-slate-300">
-                      Opportunity Cost Recovered
-                    </p>
-                    <Info className="w-4 h-4 text-slate-400 opacity-75" />
-
-                    {/* Tooltip */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-800 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
-                      <p className="font-semibold mb-1">In plain English:</p>
-                      This is the money you're practically setting on fire by doing administrative work instead of billable work.
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+            
+            {/* The Blur Wrapper */}
+            <div className={`transition-all duration-700 ${!isUnlocked ? 'filter blur-md select-none pointer-events-none' : ''}`}>
+              
+              {/* Big Numbers Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white rounded-2xl shadow-lg border-l-4 border-primary-500 p-6 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center space-x-2 group relative">
+                      <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide cursor-help border-b border-dashed border-slate-300">
+                        Opportunity Cost Recovered
+                      </p>
+                      <Info className="w-4 h-4 text-slate-400 opacity-75" />
+                    </div>
+                    
+                    <div className="mt-2 flex items-baseline">
+                      <span className="text-4xl font-bold text-slate-900">${results.annualSavings.toLocaleString()}</span>
                     </div>
                   </div>
-
-                  <div className="mt-2 flex items-baseline">
-                    <span className="text-4xl font-bold text-slate-900">${results.annualSavings.toLocaleString()}</span>
+                  <div className="mt-4 text-xs text-slate-400 flex items-center">
+                    <TrendingUp className="w-4 h-4 mr-1 text-green-500" />
+                    That's a lot of roller skates.
                   </div>
                 </div>
-                <div className="mt-4 text-xs text-slate-400 flex items-center">
-                  <TrendingUp className="w-4 h-4 mr-1 text-green-500" />
-                  That's a lot of roller skates.
+
+                <div className="bg-white rounded-2xl shadow-lg border-l-4 border-indigo-500 p-6 flex flex-col justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Hours Saved Annually</p>
+                    <div className="mt-2 flex items-baseline">
+                      <span className="text-4xl font-bold text-slate-900">{Math.round(results.hoursSavedAnnually).toLocaleString()}</span>
+                      <span className="ml-1 text-lg text-slate-500">hrs</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-xs text-slate-500 flex items-start">
+                    <Smile className="w-4 h-4 mr-1 text-indigo-500 mt-0.5 shrink-0" />
+                    <span>Enough time to start <strong>{funActivity}</strong>!</span>
+                  </div>
+                </div>
+
+                {/* ROI Days Card */}
+                <div className="md:col-span-2 bg-white rounded-2xl shadow-lg border-l-4 border-emerald-500 p-6 flex items-center justify-between relative overflow-hidden">
+                  <div className="relative z-10">
+                    <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">The "No-Brainer" Stat</p>
+                    <div className="mt-2 flex items-baseline">
+                      <span className="text-4xl font-bold text-slate-900">
+                        {results.roiDays > 0 ? Math.ceil(results.roiDays) : "N/A"}
+                      </span>
+                      <span className="ml-2 text-xl font-medium text-slate-600">Working Days</span>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-400">
+                      {results.roiDays > 0 
+                        ? `Your $${setupCost.toLocaleString()} investment pays for itself in ${Math.ceil(results.roiDays)} days. The rest is pure profit (or fun).`
+                        : "Savings are currently negative. Are you charging enough?"}
+                    </p>
+                  </div>
+                  <div className="hidden sm:block p-4 bg-emerald-50 rounded-full transform rotate-12">
+                    <Rocket className="w-8 h-8 text-emerald-600" />
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl shadow-lg border-l-4 border-indigo-500 p-6 flex flex-col justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Hours Saved Annually</p>
-                  <div className="mt-2 flex items-baseline">
-                    <span className="text-4xl font-bold text-slate-900">{Math.round(results.hoursSavedAnnually).toLocaleString()}</span>
-                    <span className="ml-1 text-lg text-slate-500">hrs</span>
-                  </div>
-                </div>
-                <div className="mt-4 text-xs text-slate-500 flex items-start">
-                  <Smile className="w-4 h-4 mr-1 text-indigo-500 mt-0.5 shrink-0" />
-                  <span>Enough time to start <strong>{funActivity}</strong>!</span>
-                </div>
-              </div>
-
-              {/* ROI Days Card */}
-              <div className="md:col-span-2 bg-white rounded-2xl shadow-lg border-l-4 border-emerald-500 p-6 flex items-center justify-between relative overflow-hidden">
-                <div className="relative z-10">
-                  <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">The "No-Brainer" Stat</p>
-                  <div className="mt-2 flex items-baseline">
-                    <span className="text-4xl font-bold text-slate-900">
-                      {results.roiDays > 0 ? Math.ceil(results.roiDays) : "N/A"}
-                    </span>
-                    <span className="ml-2 text-xl font-medium text-slate-600">Working Days</span>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-400">
-                    {results.roiDays > 0
-                      ? `Your $${setupCost.toLocaleString()} investment pays for itself in ${Math.ceil(results.roiDays)} days. The rest is pure profit (or fun).`
-                      : "Savings are currently negative. Are you charging enough?"}
-                  </p>
-                </div>
-                <div className="hidden sm:block p-4 bg-emerald-50 rounded-full transform rotate-12">
-                  <Rocket className="w-8 h-8 text-emerald-600" />
-                </div>
-              </div>
-            </div>
-
-            {/* Chart Section */}
-            <div className={!isUnlocked ? 'filter blur-sm' : ''}>
-              <Charts
+              {/* Chart Section */}
+              <Charts 
                 monthlyManualCost={monthlyManualCost}
                 monthlyAutomatedCost={monthlyAutomatedCost}
                 setupCost={setupCost}
               />
-            </div>
 
-            {/* CTA / Context Section */}
-            <div className={`bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center ${!isUnlocked ? 'filter blur-sm' : ''}`}>
-              <h3 className="text-2xl font-serif font-bold text-slate-900 mb-3">
-                Ready to reclaim those {Math.round(results.hoursSavedAnnually / 12)} hours next month?
-              </h3>
-              <p className="text-slate-600 mb-8 max-w-lg mx-auto">
-                Warning: Sudden increase in free time may lead to spontaneous hobbies like <strong>{funActivity}</strong>. Proceed with caution.
-              </p>
-
-              <div className="flex justify-center">
-                <a
-                  href="https://calendar.app.google/tvRdRPuBEsnbKaE48"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all transform hover:-translate-y-1 shadow-lg hover:shadow-xl flex items-center justify-center cursor-pointer"
-                >
-                  Book 15 Min Demo
-                </a>
-              </div>
-
-              <div className="mt-8 flex justify-center space-x-8 text-slate-400 text-sm">
-                <div className="flex items-center">
-                  <CheckCircle2 className="w-4 h-4 mr-1 text-green-500" />
-                  No new software to learn
-                </div>
-                <div className="flex items-center">
-                  <CheckCircle2 className="w-4 h-4 mr-1 text-green-500" />
-                  Roller skates not included
+              {/* CTA / Context Section */}
+              <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center">
+                <h3 className="text-2xl font-serif font-bold text-slate-900 mb-3">
+                  Ready to reclaim those {Math.round(results.hoursSavedAnnually / 12)} hours next month?
+                </h3>
+                <p className="text-slate-600 mb-8 max-w-lg mx-auto">
+                  Warning: Sudden increase in free time may lead to spontaneous hobbies like <strong>{funActivity}</strong>. Proceed with caution.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                  <a 
+                    href="https://calendar.app.google/tvRdRPuBEsnbKaE48"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full sm:w-auto bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 px-8 py-4 rounded-xl font-bold text-lg transition-colors flex items-center justify-center cursor-pointer"
+                  >
+                    Book 15 Min Demo
+                  </a>
                 </div>
               </div>
             </div>
+
+            {/* THE UNLOCK OVERLAY */}
+            {!isUnlocked && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center">
+                <div className="text-center p-6">
+                   <button
+                     onClick={() => setShowEmailModal(true)}
+                     className="bg-primary-600 hover:bg-primary-700 text-white text-xl font-bold py-5 px-10 rounded-full shadow-2xl transform hover:scale-105 transition-all flex items-center mx-auto border-4 border-white/20 ring-4 ring-primary-500/20"
+                   >
+                     <Lock className="w-6 h-6 mr-3" />
+                     Reveal My Savings Report
+                   </button>
+                   <p className="mt-4 text-slate-500 font-medium bg-white/80 inline-block px-4 py-1 rounded-full backdrop-blur-sm">
+                     Adjust the sliders to see the charts update
+                   </p>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
       </main>
+      
+      {/* Sticky Mobile CTA */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 md:hidden z-40">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-xs text-slate-500 uppercase">Annual "Fun Fund"</p>
+            {isUnlocked ? (
+              <p className="text-xl font-bold text-slate-900">${results.annualSavings.toLocaleString()}</p>
+            ) : (
+              <p className="text-xl font-bold text-slate-400 blur-sm">$15,000</p>
+            )}
+          </div>
+          {isUnlocked ? (
+             <a 
+               href={mailtoLink}
+               onClick={() => sendWebhookData(userEmail)}
+               className="bg-primary-600 text-white px-6 py-2 rounded-lg font-bold text-sm"
+             >
+               Contact Bryan
+             </a>
+          ) : (
+            <button
+              onClick={() => setShowEmailModal(true)}
+               className="bg-primary-600 text-white px-6 py-2 rounded-lg font-bold text-sm flex items-center"
+            >
+              <Lock className="w-3 h-3 mr-1" />
+              Unlock
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Email Capture Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowEmailModal(false)}></div>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-50 p-6 md:p-8 animate-[fadeIn_0.2s_ease-out]">
+            <button 
+              onClick={() => setShowEmailModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="bg-primary-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <Rocket className="w-6 h-6 text-primary-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">Unlock Your Report</h3>
+              <p className="text-slate-600">
+                Where should we send your custom ROI breakdown and efficiency analysis?
+              </p>
+            </div>
+
+            <form onSubmit={handleUnlockSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Work Email</label>
+                <input 
+                  type="email" 
+                  value={userEmail}
+                  onChange={(e) => {
+                    setUserEmail(e.target.value);
+                    setEmailError(false);
+                  }}
+                  placeholder="name@lawfirm.com"
+                  className={`w-full px-4 py-3 rounded-xl border ${emailError ? 'border-red-300 focus:ring-red-200' : 'border-slate-300 focus:ring-primary-100'} focus:border-primary-500 focus:ring-4 transition-all outline-none`}
+                  autoFocus
+                />
+                {emailError && <p className="text-red-500 text-xs mt-1">Please enter a valid email address.</p>}
+              </div>
+              
+              <button 
+                type="submit"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition-all transform hover:-translate-y-0.5 shadow-lg"
+              >
+                Reveal My Savings
+              </button>
+              
+              <p className="text-xs text-center text-slate-400 mt-4">
+                We'll only use this to send you the calculator results. No spam, we promise.
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
