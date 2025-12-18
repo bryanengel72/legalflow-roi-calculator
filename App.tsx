@@ -95,7 +95,7 @@ const App: React.FC = () => {
       // Send email to webhook
       try {
         console.log('Sending to webhook...');
-        const response = await fetch('https://n8n.srv1137065.hstgr.cloud/webhook-test/a8d8e344-8947-482c-afcf-c77825e79095', {
+        const response = await fetch('/api/webhook', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -107,7 +107,7 @@ const App: React.FC = () => {
             calculatorResults: results,
           }),
         });
-        console.log('Webhook response:', response.status, await response.text());
+        console.log('Webhook response:', response.status, await response.json());
       } catch (error) {
         console.error('Failed to send to webhook:', error);
         // Still unlock even if webhook fails
