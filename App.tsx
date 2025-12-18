@@ -91,7 +91,7 @@ const App: React.FC = () => {
 
   const sendWebhookData = (email: string) => {
     // Send all input and result data to the n8n webhook.
-    fetch('https://n8n.srv1137065.hstgr.cloud/webhook/a8d8e344-8947-482c-afcf-c77825e79095', {
+    fetch('https://n8n.srv1137065.hstgr.cloud/webhook-test/a8d8e344-8947-482c-afcf-c77825e79095', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
