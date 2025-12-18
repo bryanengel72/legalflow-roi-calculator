@@ -11,7 +11,15 @@
       "Bash(npm run preview:*)",
       "Bash(open http://localhost:4173/)",
       "Bash(open https://www.smartlawyer-roi.com)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nAdd email gate with webhook integration\n\n- Add email overlay that locks results until user provides email\n- Apply blur effects to all results sections when locked\n- Remove \"Reply to Bryan\" email button\n- Remove mobile CTA with \"Contact Bryan\" button\n- Integrate n8n webhook for email capture\n- Clean up unused Mail import and email-related variables\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd email gate with webhook integration\n\n- Add email overlay that locks results until user provides email\n- Apply blur effects to all results sections when locked\n- Remove \"Reply to Bryan\" email button\n- Remove mobile CTA with \"Contact Bryan\" button\n- Integrate n8n webhook for email capture\n- Clean up unused Mail import and email-related variables\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git config:*)",
+      "Bash(git commit:*)",
+      "Bash(open:*)",
+      "Bash(cat:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git remote set-url:*)"
     ]
   }
 }
