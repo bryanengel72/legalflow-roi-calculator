@@ -4,6 +4,7 @@ import InputSlider from './components/InputSlider';
 import Charts from './components/Charts';
 import { CalculationData, CalculationResults } from './types';
 import { generateEfficiencyInsight } from './services/geminiService';
+// Force rebuild
 
 const FUN_ACTIVITIES = [
   "mastering roller derby",
