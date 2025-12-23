@@ -18,6 +18,17 @@ const FUN_ACTIVITIES = [
   "writing a bad novel"
 ];
 
+const AGREEMENT_TYPES = [
+  "NDAs (mutual or one-way)",
+  "Service/consulting agreements",
+  "Contractor agreements",
+  "Vendor/supplier agreements",
+  "MSAs and SOWs",
+  "Operating agreements",
+  "Commercial leases",
+  "Licensing agreements"
+];
+
 const App: React.FC = () => {
   // --- State ---
   const [hourlyRate, setHourlyRate] = useState<number>(450);
@@ -136,7 +147,25 @@ const App: React.FC = () => {
             <span className="block text-2xl md:text-3xl mt-2 text-slate-400 font-sans font-light">(And maybe your sanity too.)</span>
           </h1>
           <p className="text-lg text-slate-400 max-w-2xl mt-4">
-            Commercial agreements shouldn't be a soul-sucking loss leader. Let's do the math on how much fun you're missing out on.
+            <span className="group relative inline-block">
+              <span className="border-b-2 border-dashed border-slate-500 cursor-help">
+                Commercial agreements
+              </span>
+
+              {/* Tooltip */}
+              <span className="absolute bottom-full left-0 mb-3 w-80 bg-slate-800 text-white text-sm rounded-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
+                <p className="font-semibold mb-2 text-sky-300">We automate:</p>
+                <ul className="space-y-1 text-xs">
+                  {AGREEMENT_TYPES.map((type, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="text-sky-400 mr-2">•</span>
+                      <span>{type}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="absolute top-full left-12 border-8 border-transparent border-t-slate-800"></div>
+              </span>
+            </span> shouldn't be a soul-sucking loss leader. Let's do the math on how much fun you're missing out on.
           </p>
         </div>
       </header>
